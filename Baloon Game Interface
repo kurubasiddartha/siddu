@@ -1,0 +1,198 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Balloon Popper',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: BalloonGameScreen(),
+    );
+  }
+}
+
+class BalloonGameScreen extends StatefulWidget {
+  @override
+  _BalloonGameScreenState createState() => _BalloonGameScreenState();
+}
+
+class _BalloonGameScreenState extends State<BalloonGameScreen> {
+  int score = 0;
+  int balloonsPopped = 0;
+  int balloonsMissed = 0;
+  late Timer _timer;
+  Duration _duration = const Duration(minutes: 2);
+  late DateTime _endTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _endTime = DateTime.now().add(_duration);
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        if (DateTime.now().isBefore(_endTime)) {
+          _duration = _endTime.difference(DateTime.now());
+        } else {
+          _timer.cancel();
+          // Game Over
+          _showGameOverDialog();
+        }
+      });
+    });
+  }
+
+  void _showGameOverDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Game Over"),
+          content: Text("Your Score: $score\nBalloons Popped: $balloonsPopped\nBalloons Missed: $balloonsMissed"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _resetGame();
+              },
+              child: Text("Play Again"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _resetGame() {
+    setState(() {
+      score = 0;
+      balloonsPopped = 0;
+      balloonsMissed = 0;
+      _duration = const Duration(minutes: 2);
+      _endTime = DateTime.now().add(_duration);
+      _startTimer();
+    });
+  }
+
+  void _popBalloon(bool popped) {
+    setState(() {
+      if (popped) {
+        score += 2;
+        balloonsPopped++;
+      } else {
+        score--;
+        balloonsMissed++;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Balloon Popper"),
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            "${_duration.inMinutes.toString().padLeft(2, '0')}:${(_duration.inSeconds % 60).toString().padLeft(2, '0')}",
+            style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 20),
+          Text(
+            "Score: $score",
+            style: TextStyle(fontSize: 20),
+          ),
+          SizedBox(height: 20),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                _popBalloon(true);
+              },
+              child: Stack(
+                children: List.generate(10, (index) {
+                  return Balloon(
+                    key: UniqueKey(),
+                    onPopped: _popBalloon,
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class Balloon extends StatefulWidget {
+  final Function(bool) onPopped;
+
+  const Balloon({Key? key, required this.onPopped}) : super(key: key);
+
+  @override
+  _BalloonState createState() => _BalloonState();
+}
+
+class _BalloonState extends State<Balloon> {
+  late double _bottom;
+  late double _left;
+  late bool _popped;
+
+  @override
+  void initState() {
+    super.initState();
+    _bottom = Random().nextDouble() * 400;
+    _left = Random().nextDouble() * 300;
+    _popped = false;
+    _startMovement();
+  }
+
+  void _startMovement() {
+    Timer.periodic(Duration(milliseconds: 50), (timer) {
+      if (_bottom > -100) {
+        setState(() {
+          _bottom -= 1;
+        });
+      } else {
+        timer.cancel();
+        if (!_popped) {
+          widget.onPopped(false);
+        }
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: _bottom,
+      left: _left,
+      child: GestureDetector(
+        onTap: () {
+          if (!_popped) {
+            setState(() {
+              _popped = true;
+            });
+            widget.onPopped(true);
+          }
+        },
+        child: _popped ? SizedBox() : Icon(Icons.bubble_chart, size: 50, color: Colors.red),
+      ),
+    );
+  }
+}
